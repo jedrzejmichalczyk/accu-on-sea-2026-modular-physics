@@ -4,7 +4,6 @@
 #include "../../core/scalar.hpp"
 #include "tags.hpp"
 #include <span>
-#include <string>
 #include <stdexcept>
 
 namespace sopot::physics::coupled {
@@ -38,18 +37,15 @@ private:
     double m_stiffness;    // spring constant k   [N/m]
     double m_rest_length;  // natural length L0   [m]
     double m_damping;      // damping coefficient c [N·s/m]
-    std::string m_name;
 
 public:
     Spring(
         double stiffness,
         double rest_length = 1.0,
-        double damping = 0.0,
-        std::string name = "spring"
+        double damping = 0.0
     ) : m_stiffness(stiffness)
       , m_rest_length(rest_length)
-      , m_damping(damping)
-      , m_name(std::move(name)) {
+      , m_damping(damping) {
         if (stiffness <= 0.0) {
             throw std::invalid_argument("Spring stiffness must be positive");
         }
@@ -63,8 +59,6 @@ public:
     //=========================================================================
 
     LocalState getInitialLocalState() const { return {}; }
-    std::string_view getComponentType() const { return "Spring"; }
-    std::string_view getComponentName() const { return m_name; }
 
     //=========================================================================
     // State Functions - Forces and Spring Properties

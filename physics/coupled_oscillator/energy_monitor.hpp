@@ -4,7 +4,6 @@
 #include "../../core/scalar.hpp"
 #include "tags.hpp"
 #include <span>
-#include <string>
 
 namespace sopot::physics::coupled {
 
@@ -31,20 +30,11 @@ public:
     using typename Base::LocalState;
     using typename Base::LocalDerivative;
 
-private:
-    std::string m_name;
-
-public:
-    EnergyMonitor(std::string name = "energy_monitor")
-        : m_name(std::move(name)) {}
-
     //=========================================================================
     // Required Component Interface
     //=========================================================================
 
     LocalState getInitialLocalState() const { return {}; }
-    std::string_view getComponentType() const { return "EnergyMonitor"; }
-    std::string_view getComponentName() const { return m_name; }
 
     //=========================================================================
     // State Functions - System-Level Quantities

@@ -78,10 +78,10 @@ auto createCoupledOscillator(
     double k, double L0 = 1.0, double damping = 0.0
 ) {
     return makeTypedODESystem<T>(
-        Mass1<T>(m1, x1_0, v1_0, "mass1"),
-        Mass2<T>(m2, x2_0, v2_0, "mass2"),
-        Spring12<T>(k, L0, damping, "spring"),
-        EnergyMonitor<T>("energy_monitor")
+        Mass1<T>(m1, x1_0, v1_0),
+        Mass2<T>(m2, x2_0, v2_0),
+        Spring12<T>(k, L0, damping),
+        EnergyMonitor<T>()
     );
 }
 

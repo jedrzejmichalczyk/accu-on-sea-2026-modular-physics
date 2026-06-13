@@ -7,8 +7,6 @@
 #include <span>
 #include <type_traits>
 #include <concepts>
-#include <stdexcept>
-#include <string_view>
 
 namespace sopot {
 
@@ -16,51 +14,29 @@ namespace sopot {
 template<size_t N, Scalar T> class TypedComponent;
 
 //=============================================================================
-// Component Concepts - All compile-time verification
+// Component Concepts - the contract a component meets, checked at compile time
 //=============================================================================
 
-// Basic component structure requirements
+// What every component is: the state-type aliases, a compile-time state_size,
+// and an initial value for its own state slice.
 template<typename C>
-concept TypedComponentConcept = requires {
+concept TypedComponentConcept = requires(const C& c) {
     typename C::scalar_type;
     typename C::LocalState;
     typename C::LocalDerivative;
     { C::state_size } -> std::convertible_to<size_t>;
+    { c.getInitialLocalState() } -> std::same_as<typename C::LocalState>;
 };
 
-// A stateful component must provide derivatives(t, state, registry), returning
-// the time-derivative of its own state slice. It reads its own variables from
-// `state` via localState() and any other quantities via query().
+// Extra contract for a component that owns state (state_size > 0): it provides
+// derivatives(t, state, registry) returning the time-derivative of its own
+// slice, reading its own variables via localState() and others via query().
 template<typename Component, typename T, typename Registry>
 concept HasDerivativesMethod = requires(
-    const Component& c,
-    T t,
-    std::span<const T> state,
-    const Registry& registry
+    const Component& c, T t, std::span<const T> state, const Registry& registry
 ) {
     { c.derivatives(t, state, registry) } -> std::same_as<typename Component::LocalDerivative>;
 };
-
-// Check if component has getInitialLocalState (non-virtual)
-template<typename Component>
-concept HasInitialState = requires(const Component& c) {
-    { c.getInitialLocalState() } -> std::same_as<typename Component::LocalState>;
-};
-
-// Check if component has identification methods (non-virtual)
-template<typename Component>
-concept HasIdentification = requires(const Component& c) {
-    { c.getComponentType() } -> std::convertible_to<std::string_view>;
-    { c.getComponentName() } -> std::convertible_to<std::string_view>;
-};
-
-// Complete component concept - all required interfaces
-template<typename C, typename T, typename Registry>
-concept CompleteTypedComponent =
-    TypedComponentConcept<C> &&
-    HasInitialState<C> &&
-    HasIdentification<C> &&
-    (C::state_size == 0 || HasDerivativesMethod<C, T, Registry>);
 
 // A component provides Tag's state function if it defines
 // compute(Tag, state, registry). Every compute() takes the registry - even the
@@ -98,21 +74,18 @@ inline auto query(const Registry& registry, std::span<const T> state) {
 //=============================================================================
 // TypedComponent - Non-virtual base class for components
 //=============================================================================
-// All dispatch is resolved at compile time through concepts and templates.
-// No virtual functions - components must provide required methods directly.
+// No virtual functions: a component just provides the methods the concepts
+// above require, resolved at compile time.
 //
-// Required methods for components:
-//   - derivatives(t, state, registry) -> LocalDerivative
-//     (only required if state_size > 0)
+// Required of every component:
 //   - getInitialLocalState() -> LocalState
-//   - getComponentType() -> std::string_view
-//   - getComponentName() -> std::string_view
 //   - compute(Tag{}, state, registry) for each state function it provides
+// Required only if state_size > 0:
+//   - derivatives(t, state, registry) -> LocalDerivative
 //
-// This base class provides:
-//   - Type aliases (scalar_type, LocalState, LocalDerivative)
-//   - State offset management
-//   - Helper functions for state access
+// This base class supplies the type aliases (scalar_type, LocalState,
+// LocalDerivative), tracks the component's offset in the global state vector,
+// and provides localState() for reading the component's own variables.
 //=============================================================================
 
 template<size_t StateSize, Scalar T = double>

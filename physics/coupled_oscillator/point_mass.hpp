@@ -4,7 +4,7 @@
 #include "../../core/scalar.hpp"
 #include "tags.hpp"
 #include <span>
-#include <string>
+#include <stdexcept>
 
 namespace sopot::physics::coupled {
 
@@ -34,18 +34,15 @@ private:
     double m_mass;
     double m_initial_position;
     double m_initial_velocity;
-    std::string m_name;
 
 public:
     PointMass(
         double mass,
         double initial_position = 0.0,
-        double initial_velocity = 0.0,
-        std::string name = "point_mass"
+        double initial_velocity = 0.0
     ) : m_mass(mass)
       , m_initial_position(initial_position)
-      , m_initial_velocity(initial_velocity)
-      , m_name(std::move(name)) {
+      , m_initial_velocity(initial_velocity) {
         if (mass <= 0.0) {
             throw std::invalid_argument("Mass must be positive");
         }
@@ -58,9 +55,6 @@ public:
     LocalState getInitialLocalState() const {
         return {T(m_initial_position), T(m_initial_velocity)};
     }
-
-    std::string_view getComponentType() const { return "PointMass"; }
-    std::string_view getComponentName() const { return m_name; }
 
     //=========================================================================
     // Derivatives - dx/dt = v, dv/dt = F/m

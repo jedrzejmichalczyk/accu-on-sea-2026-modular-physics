@@ -81,7 +81,7 @@ public:
     // Force on mass 1: restoring spring force, plus damping if c > 0.
     template<typename Registry>
     T compute(typename TagSet1::Force, std::span<const T> state, const Registry& registry) const {
-        T extension = compute(spring::Extension{}, state, registry);
+        T extension = query<spring::Extension>(registry, state);
         T force = -T(m_stiffness) * extension;
 
         if (m_damping > 0.0) {
@@ -95,13 +95,13 @@ public:
     // Force on mass 2 is equal and opposite (Newton's 3rd law).
     template<typename Registry>
     T compute(typename TagSet2::Force, std::span<const T> state, const Registry& registry) const {
-        return -compute(typename TagSet1::Force{}, state, registry);
+        return -query<typename TagSet1::Force>(registry, state);
     }
 
     // Potential energy stored in the spring: U = 0.5 * k * extension^2.
     template<typename Registry>
     T compute(spring::PotentialEnergy, std::span<const T> state, const Registry& registry) const {
-        T ext = compute(spring::Extension{}, state, registry);
+        T ext = query<spring::Extension>(registry, state);
         return T(0.5 * m_stiffness) * ext * ext;
     }
 

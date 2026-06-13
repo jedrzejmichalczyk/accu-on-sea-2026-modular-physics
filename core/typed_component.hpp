@@ -62,27 +62,15 @@ concept CompleteTypedComponent =
     HasIdentification<C> &&
     (C::state_size == 0 || HasDerivativesMethod<C, T, Registry>);
 
-// Check if component provides a specific state function with span (preferred)
-template<typename Component, typename Tag, typename T>
-concept TypedProvidesStateFunctionSpan = TypedComponentConcept<Component> &&
-    StateTagConcept<Tag> &&
-    requires(const Component& c, std::span<const T> state) {
-        { c.compute(Tag{}, state) };
-    };
-
-// Check if component provides registry-aware state function (span)
+// A component provides Tag's state function if it defines
+// compute(Tag, state, registry). Every compute() takes the registry - even the
+// ones that ignore it - so any state function may query others uniformly.
 template<typename Component, typename Tag, typename T, typename Registry>
-concept TypedProvidesRegistryAwareStateFunctionSpan = TypedComponentConcept<Component> &&
+concept TypedProvidesStateFunction = TypedComponentConcept<Component> &&
     StateTagConcept<Tag> &&
     requires(const Component& c, std::span<const T> state, const Registry& reg) {
         { c.compute(Tag{}, state, reg) };
     };
-
-// Combined: component provides state function (simple or registry-aware)
-template<typename Component, typename Tag, typename T, typename Registry>
-concept TypedProvidesStateFunction =
-    TypedProvidesStateFunctionSpan<Component, Tag, T> ||
-    TypedProvidesRegistryAwareStateFunctionSpan<Component, Tag, T, Registry>;
 
 //=============================================================================
 // query<Tag>() - Ask the system for a quantity by its tag
@@ -119,7 +107,7 @@ inline auto query(const Registry& registry, std::span<const T> state) {
 //   - getInitialLocalState() -> LocalState
 //   - getComponentType() -> std::string_view
 //   - getComponentName() -> std::string_view
-//   - compute(Tag{}, state) or compute(Tag{}, state, registry) for state functions
+//   - compute(Tag{}, state, registry) for each state function it provides
 //
 // This base class provides:
 //   - Type aliases (scalar_type, LocalState, LocalDerivative)
@@ -155,8 +143,9 @@ protected:
 //=============================================================================
 // TypedRegistry - Compile-time registry for state function dispatch
 //=============================================================================
-// All state function resolution happens at compile time.
-// Registry-aware compute() methods take precedence over simple compute().
+// Holds references to every component and, for a given tag, resolves which
+// component provides it - entirely at compile time. The provider's compute()
+// receives the registry, so it can query further state functions in turn.
 //=============================================================================
 
 template<typename T, TypedComponentConcept... Components>
@@ -206,20 +195,12 @@ public:
         return (TypedProvidesStateFunction<Components, Tag, T, Self> || ...);
     }
 
-    // Zero-overhead function dispatch (span interface only)
-    // Registry-aware compute() takes precedence over simple compute()
+    // Zero-overhead dispatch: hand the chosen provider the state and the
+    // registry, so its compute() can in turn query other state functions.
     template<StateTagConcept Tag>
     auto computeFunction(std::span<const T> state) const {
         static_assert(hasFunction<Tag>(), "No component provides this state function");
-        const auto& provider = findProvider<Tag>();
-        using ProviderType = std::decay_t<decltype(provider)>;
-
-        // Prefer registry-aware compute over simple compute
-        if constexpr (TypedProvidesRegistryAwareStateFunctionSpan<ProviderType, Tag, T, Self>) {
-            return provider.compute(Tag{}, state, *this);
-        } else {
-            return provider.compute(Tag{}, state);
-        }
+        return findProvider<Tag>().compute(Tag{}, state, *this);
     }
 
     // Convenience overload for vector - converts to span

@@ -86,15 +86,20 @@ public:
     // State Functions - Position, Velocity, Mass
     //=========================================================================
 
-    T compute(typename TagSet::Position, std::span<const T> state) const {
+    // Position and Velocity are our own state; Mass is a constant. None of
+    // these need the registry, but every compute() takes it for uniformity.
+    template<typename Registry>
+    T compute(typename TagSet::Position, std::span<const T> state, const Registry&) const {
         return this->localState(state, 0);   // our state slice: [position, velocity]
     }
 
-    T compute(typename TagSet::Velocity, std::span<const T> state) const {
+    template<typename Registry>
+    T compute(typename TagSet::Velocity, std::span<const T> state, const Registry&) const {
         return this->localState(state, 1);
     }
 
-    T compute(typename TagSet::Mass, [[maybe_unused]] std::span<const T> state) const {
+    template<typename Registry>
+    T compute(typename TagSet::Mass, std::span<const T>, const Registry&) const {
         return T(m_mass);
     }
 

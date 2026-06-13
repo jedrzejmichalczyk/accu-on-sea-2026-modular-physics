@@ -105,8 +105,9 @@ public:
         return T(0.5 * m_stiffness) * ext * ext;
     }
 
-    // Stiffness (a constant - no state needed).
-    T compute(spring::Stiffness, [[maybe_unused]] std::span<const T> state) const {
+    // Stiffness (a constant - needs neither state nor registry).
+    template<typename Registry>
+    T compute(spring::Stiffness, std::span<const T>, const Registry&) const {
         return T(m_stiffness);
     }
 

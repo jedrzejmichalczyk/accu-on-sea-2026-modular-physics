@@ -195,27 +195,14 @@ public:
         return (TypedProvidesStateFunction<Components, Tag, T, Self> || ...);
     }
 
-    // Zero-overhead dispatch: hand the chosen provider the state and the
+    // The dispatch mechanism: hand the chosen provider the state and the
     // registry, so its compute() can in turn query other state functions.
+    // The public spelling is the free function query<Tag>(registry, state),
+    // which simply forwards here.
     template<StateTagConcept Tag>
     auto computeFunction(std::span<const T> state) const {
         static_assert(hasFunction<Tag>(), "No component provides this state function");
         return findProvider<Tag>().compute(Tag{}, state, *this);
-    }
-
-    // Convenience overload for vector - converts to span
-    template<StateTagConcept Tag>
-    auto computeFunction(const std::vector<T>& state) const {
-        return computeFunction<Tag>(std::span<const T>(state));
-    }
-
-    static constexpr size_t component_count() {
-        return sizeof...(Components);
-    }
-
-    template<size_t I>
-    constexpr const auto& getComponent() const {
-        return std::get<I>(m_components);
     }
 };
 
@@ -238,7 +225,6 @@ private:
     TypedRegistry<T, Components...> m_registry;
 
     static constexpr size_t m_total_state_size = (Components::state_size + ...);
-    static constexpr size_t m_component_count = sizeof...(Components);
     using RegistryType = TypedRegistry<T, Components...>;
 
     // Each component owns a contiguous slice of the global state vector.
@@ -356,47 +342,16 @@ public:
         return RegistryType::template hasFunction<Tag>();
     }
 
+    // Ask the system for a quantity by its tag - the driver-facing spelling of
+    // the same query<>() components use internally.
     template<StateTagConcept Tag>
-    auto computeStateFunction(const std::vector<T>& state) const {
-        return m_registry.template computeFunction<Tag>(state);
+    auto query(const std::vector<T>& state) const {
+        return query<Tag>(std::span<const T>(state));
     }
 
     template<StateTagConcept Tag>
-    auto computeStateFunction(std::span<const T> state) const {
+    auto query(std::span<const T> state) const {
         return m_registry.template computeFunction<Tag>(state);
-    }
-
-    // Batch function evaluation
-    template<StateTagConcept... Tags>
-    auto computeStateFunctions(const std::vector<T>& state) const {
-        static_assert(sizeof...(Tags) > 0, "Must specify at least one function");
-        static_assert((hasFunction<Tags>() && ...),
-                     "All requested functions must be available");
-        return std::tuple{m_registry.template computeFunction<Tags>(state)...};
-    }
-
-    // Component access
-    template<size_t I>
-    requires (I < sizeof...(Components))
-    constexpr const auto& getComponent() const {
-        return std::get<I>(m_components);
-    }
-
-    static constexpr size_t getComponentCount() noexcept {
-        return m_component_count;
-    }
-
-    const auto& getRegistry() const {
-        return m_registry;
-    }
-
-    // Convert state to values (for output)
-    std::vector<double> stateValues(const std::vector<T>& state) const {
-        std::vector<double> values(state.size());
-        for (size_t i = 0; i < state.size(); ++i) {
-            values[i] = value_of(state[i]);
-        }
-        return values;
     }
 };
 

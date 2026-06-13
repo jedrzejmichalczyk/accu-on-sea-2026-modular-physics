@@ -32,17 +32,17 @@ int main() {
     auto sol = solver.solve(deriv, sys.getStateDimension(), 0.0, 20.0, 0.001,
                             sys.getInitialState());
 
-    const double E0 = sys.computeStateFunction<system::TotalEnergy>(sol.states.front());
+    const double E0 = sys.query<system::TotalEnergy>(sol.states.front());
     double max_drift = 0.0;
 
     std::ofstream csv("oscillator_data.csv");
     csv << "t,x1,x2,E,drift\n";
     for (size_t i = 0; i < sol.size(); i += 10) {
         const auto& s = sol.states[i];
-        const double E     = sys.computeStateFunction<system::TotalEnergy>(s);
+        const double E     = sys.query<system::TotalEnergy>(s);
         const double drift = (E - E0) / E0;
-        const double x1    = sys.computeStateFunction<mass1::Position>(s);
-        const double x2    = sys.computeStateFunction<mass2::Position>(s);
+        const double x1    = sys.query<mass1::Position>(s);
+        const double x2    = sys.query<mass2::Position>(s);
         max_drift = std::max(max_drift, std::abs(drift));
         csv << std::format("{:.6f},{:.9f},{:.9f},{:.15e},{:.3e}\n",
                            sol.times[i], x1, x2, E, drift);

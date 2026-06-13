@@ -55,7 +55,7 @@
 //   // ...or just call createCoupledOscillator(...) below.
 //
 //   auto state  = system.getInitialState();
-//   auto energy = system.computeStateFunction<system::TotalEnergy>(state);
+//   auto energy = system.query<system::TotalEnergy>(state);
 //
 //=============================================================================
 

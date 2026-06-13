@@ -28,17 +28,17 @@ concept TypedComponentConcept = requires {
     { C::state_size } -> std::convertible_to<size_t>;
 };
 
-// Check if component has derivatives method (CRTP-style, non-virtual)
-// This is the required interface for components with state
+// A stateful component must provide derivatives(t, state, registry), returning
+// the time-derivative of its own state slice. It reads its own variables from
+// `state` via localState() and any other quantities via query().
 template<typename Component, typename T, typename Registry>
 concept HasDerivativesMethod = requires(
     const Component& c,
     T t,
-    std::span<const T> local,
-    std::span<const T> global,
+    std::span<const T> state,
     const Registry& registry
 ) {
-    { c.derivatives(t, local, global, registry) } -> std::same_as<typename Component::LocalDerivative>;
+    { c.derivatives(t, state, registry) } -> std::same_as<typename Component::LocalDerivative>;
 };
 
 // Check if component has getInitialLocalState (non-virtual)
@@ -114,7 +114,7 @@ inline auto query(const Registry& registry, std::span<const T> state) {
 // No virtual functions - components must provide required methods directly.
 //
 // Required methods for components:
-//   - derivatives(t, local_span, global_span, registry) -> LocalDerivative
+//   - derivatives(t, state, registry) -> LocalDerivative
 //     (only required if state_size > 0)
 //   - getInitialLocalState() -> LocalState
 //   - getComponentType() -> std::string_view
@@ -245,7 +245,7 @@ public:
 // All dispatch is resolved at compile time - no virtual functions.
 //
 // Components must provide:
-//   - derivatives(t, local_span, global_span, registry) -> LocalDerivative
+//   - derivatives(t, state, registry) -> LocalDerivative
 //     (only required if state_size > 0)
 //   - getInitialLocalState() -> LocalState
 //=============================================================================
@@ -293,17 +293,14 @@ private:
             const auto& component = std::get<I>(m_components);
             constexpr size_t off = offset<I>();
 
-            // Create spans for local and global state
-            std::span<const T> local_span(state.data() + off, local_size);
-            std::span<const T> global_span(state);
-
             // Compile-time requirement: component must have derivatives method
             static_assert(
                 HasDerivativesMethod<ComponentType, T, RegistryType>,
-                "Component with state_size > 0 must provide derivatives(t, local, global, registry)"
+                "Component with state_size > 0 must provide derivatives(t, state, registry)"
             );
 
-            auto local_derivs = component.derivatives(t, local_span, global_span, m_registry);
+            // Hand the component the full state; it picks out its own slice.
+            auto local_derivs = component.derivatives(t, std::span<const T>(state), m_registry);
             for (size_t j = 0; j < local_size; ++j) {
                 derivatives[off + j] = local_derivs[j];
             }

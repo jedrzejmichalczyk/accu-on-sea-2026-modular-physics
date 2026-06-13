@@ -69,15 +69,14 @@ public:
     template<typename Registry>
     LocalDerivative derivatives(
         [[maybe_unused]] T t,
-        std::span<const T> local,
-        std::span<const T> global,
+        std::span<const T> state,
         const Registry& registry
     ) const {
         // dx/dt = v        — velocity is our own second state variable
-        T velocity = local[1];
+        T velocity = this->localState(state, 1);
 
         // dv/dt = F/m      — ask the system for the force on this mass
-        T force = query<typename TagSet::Force>(registry, global);
+        T force = query<typename TagSet::Force>(registry, state);
         T acceleration = force / T(m_mass);
 
         return {velocity, acceleration};

@@ -85,38 +85,25 @@ concept TypedProvidesStateFunction =
     TypedProvidesRegistryAwareStateFunctionSpan<Component, Tag, T, Registry>;
 
 //=============================================================================
-// query<Tag>() - Simplified state function access
+// query<Tag>() - Ask the system for a quantity by its tag
 //=============================================================================
-// Free function that eliminates the need for 'registry.template' syntax.
+// A component computes one quantity from another by querying the registry:
 //
-// Usage:
-//   // Old (verbose - 'template' keyword required for dependent type):
-//   auto vel = registry.template computeFunction<kinematics::VelocityENU>(state);
+//     T force = query<mass1::Force>(registry, state);
 //
-//   // New (clean - no 'template' keyword needed):
-//   auto vel = query<kinematics::VelocityENU>(registry, state);
-//
-// Why this works: Free functions don't need the 'template' disambiguator
-// because they're not members of a dependent type.
+// As a free function it needs no 'template' disambiguator at the call site,
+// unlike the equivalent member call registry.template computeFunction<Tag>().
 //=============================================================================
 
-// Concept: Registry provides state function for Tag
+// The registry provides this tag's quantity.
 template<typename Registry, typename Tag>
 concept RegistryProvides = requires {
     { Registry::template hasFunction<Tag>() } -> std::convertible_to<bool>;
 } && Registry::template hasFunction<Tag>();
 
-// Query a state function from a registry (span version)
 template<StateTagConcept Tag, typename Registry, typename T>
     requires RegistryProvides<Registry, Tag>
 inline auto query(const Registry& registry, std::span<const T> state) {
-    return registry.template computeFunction<Tag>(state);
-}
-
-// Query a state function from a registry (vector version)
-template<StateTagConcept Tag, typename Registry, typename T>
-    requires RegistryProvides<Registry, Tag>
-inline auto query(const Registry& registry, const std::vector<T>& state) {
     return registry.template computeFunction<Tag>(state);
 }
 
@@ -151,12 +138,9 @@ public:
     // No virtual destructor needed - no polymorphic deletion through base pointer
     ~TypedComponent() = default;
 
-    // State management
+    // Where this component's slice begins in the global state vector.
     size_t getStateOffset() const noexcept { return m_state_offset; }
     void setStateOffset(size_t offset) noexcept { m_state_offset = offset; }
-
-    // Alias for CRTP-style components that use setOffset
-    void setOffset(size_t offset) noexcept { m_state_offset = offset; }
 
 protected:
     size_t m_state_offset{0};
@@ -191,28 +175,15 @@ class TypedRegistry {
     // Self type for concept checks
     using Self = TypedRegistry<T, Components...>;
 
-    // ========================================================================
-    // OPTIMIZATION: Compile-time provider index calculation
-    // ========================================================================
-    // Finds the index of the first component providing Tag at compile time.
-    //
-    // NOTE: This function still uses O(N) template recursion for index finding.
-    // However, the recursion only happens at compile-time during template
-    // instantiation, not during component access. The optimization benefit
-    // comes from separating index calculation (compile-time) from component
-    // retrieval (runtime), which enables better compiler optimization.
-    //
-    // Future improvement: Use fold expressions or std::index_sequence for
-    // fully non-recursive implementation if needed.
-
+    // Index of the first component whose compute() accepts this tag.
+    // The whole search runs during template instantiation, so by the time the
+    // program runs the provider is already a fixed, known index.
     template<StateTagConcept Tag, size_t Index = 0>
     static constexpr size_t findProviderIndex() {
         if constexpr (Index >= sizeof...(Components)) {
-            // Not found - static_assert will catch this later
-            return 0;
+            return 0;  // not found; hasFunction()'s static_assert reports it
         } else {
             using ComponentType = std::tuple_element_t<Index, std::tuple<Components...>>;
-
             if constexpr (TypedProvidesStateFunction<ComponentType, Tag, T, Self>) {
                 return Index;
             } else {
@@ -298,11 +269,8 @@ private:
     static constexpr size_t m_component_count = sizeof...(Components);
     using RegistryType = TypedRegistry<T, Components...>;
 
-    // ========================================================================
-    // OPTIMIZATION: Compile-time offset array (O(1) instead of O(N) recursion)
-    // ========================================================================
-    // Creates an array of state offsets at compile time using fold expressions.
-    // This eliminates recursive template instantiation for offset calculation.
+    // Each component owns a contiguous slice of the global state vector.
+    // This precomputes where every slice starts (and the total size, last).
     static constexpr auto make_offset_array() {
         std::array<size_t, sizeof...(Components) + 1> offsets{};
         size_t offset = 0;
@@ -315,21 +283,15 @@ private:
 
     static constexpr auto offset_array = make_offset_array();
 
-    // Initialize component state offsets using fold expression (O(1) depth)
+    // Tell each component where its slice begins.
     constexpr void initializeOffsets() {
         [this]<size_t... Is>(std::index_sequence<Is...>) {
-            // Fold expression: sets all offsets in parallel
             (std::get<Is>(m_components).setStateOffset(offset_array[Is]), ...);
-            (std::get<Is>(m_components).setOffset(offset_array[Is]), ...);
         }(std::make_index_sequence<sizeof...(Components)>{});
     }
 
-    // ========================================================================
-    // OPTIMIZATION: Fold-based derivative collection (O(1) depth)
-    // ========================================================================
-    // Uses fold expression instead of recursive template instantiation.
-    // This reduces template instantiation depth from O(N) to O(1).
-
+    // Gather every component's local derivatives into the global derivative
+    // vector. The fold visits all components; each writes into its own slice.
     template<size_t I>
     void collectDerivativeForComponent(std::vector<T>& derivatives, T t,
                                        const std::vector<T>& state) const {
@@ -364,16 +326,12 @@ private:
         }(std::make_index_sequence<sizeof...(Components)>{});
     }
 
-    // OPTIMIZATION: O(1) offset lookup instead of O(I) recursive calculation
     template<size_t I>
     static constexpr size_t offset() {
-        return offset_array[I];  // Direct array lookup - O(1)!
+        return offset_array[I];
     }
 
-    // ========================================================================
-    // OPTIMIZATION: Fold-based initial state collection (O(1) depth)
-    // ========================================================================
-
+    // Gather every component's initial local state into the global vector.
     template<size_t I>
     void collectInitialStateForComponent(std::vector<T>& state) const {
         using ComponentType = std::tuple_element_t<I, std::tuple<Components...>>;
@@ -473,42 +431,13 @@ public:
     }
 };
 
-// Factory function
+// Factory function: deduces the component types so callers can write
+// makeTypedODESystem<double>(Mass1{...}, Spring12{...}, ...).
 template<typename T = double, TypedComponentConcept... Components>
 auto makeTypedODESystem(Components&&... components) {
     return TypedODESystem<T, std::decay_t<Components>...>(
         std::forward<Components>(components)...
     );
-}
-
-// Helper to compute Jacobian using autodiff
-// Returns a matrix of ∂f_i/∂x_j where f = derivatives
-template<size_t N, TypedComponentConcept... Components>
-std::array<std::array<double, N>, N> computeJacobian(
-    const TypedODESystem<Dual<double, N>, Components...>& system,
-    double t,
-    const std::array<double, N>& state_values
-) {
-    static_assert(N == (Components::state_size + ...), "State size mismatch");
-
-    // Create state with derivatives set up for each variable
-    std::vector<Dual<double, N>> state(N);
-    for (size_t i = 0; i < N; ++i) {
-        state[i] = Dual<double, N>::variable(state_values[i], i);
-    }
-
-    // Compute derivatives
-    auto derivs = system.computeDerivatives(Dual<double, N>::constant(t), state);
-
-    // Extract Jacobian
-    std::array<std::array<double, N>, N> jacobian;
-    for (size_t i = 0; i < N; ++i) {
-        for (size_t j = 0; j < N; ++j) {
-            jacobian[i][j] = derivs[i].derivative(j);
-        }
-    }
-
-    return jacobian;
 }
 
 } // namespace sopot

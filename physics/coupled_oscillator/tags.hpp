@@ -1,97 +1,40 @@
 #pragma once
 
-#include "../../core/state_function_tags.hpp"
-#include <string_view>
-
 namespace sopot::physics::coupled {
 
 //=============================================================================
-// State Function Tags for Coupled Oscillator System
+// State-function tags for the coupled oscillator
 //=============================================================================
-// Each mass has its own TagSet struct containing Position, Velocity, Force tags.
-// This allows the Spring component to distinguish between masses via templates.
+// Each tag is an empty type used purely as a compile-time key. mass1 and mass2
+// get their own tag sets so the Spring can tell the two masses apart by type:
+// a Spring<mass1, mass2> provides mass1::Force and mass2::Force, and there is
+// no way to accidentally cross the wires.
 //=============================================================================
 
-// Tags for mass 1
 struct mass1 {
-    struct Position : categories::Kinematics {
-        static constexpr std::string_view name() { return "mass1_position"; }
-        static constexpr size_t type_id() { return 10001; }
-    };
-
-    struct Velocity : categories::Kinematics {
-        static constexpr std::string_view name() { return "mass1_velocity"; }
-        static constexpr size_t type_id() { return 10002; }
-    };
-
-    struct Force : categories::Dynamics {
-        static constexpr std::string_view name() { return "mass1_force"; }
-        static constexpr size_t type_id() { return 10003; }
-    };
-
-    struct Mass : categories::Dynamics {
-        static constexpr std::string_view name() { return "mass1_mass"; }
-        static constexpr size_t type_id() { return 10004; }
-    };
+    struct Position {};
+    struct Velocity {};
+    struct Force {};
+    struct Mass {};
 };
 
-// Tags for mass 2
 struct mass2 {
-    struct Position : categories::Kinematics {
-        static constexpr std::string_view name() { return "mass2_position"; }
-        static constexpr size_t type_id() { return 10011; }
-    };
-
-    struct Velocity : categories::Kinematics {
-        static constexpr std::string_view name() { return "mass2_velocity"; }
-        static constexpr size_t type_id() { return 10012; }
-    };
-
-    struct Force : categories::Dynamics {
-        static constexpr std::string_view name() { return "mass2_force"; }
-        static constexpr size_t type_id() { return 10013; }
-    };
-
-    struct Mass : categories::Dynamics {
-        static constexpr std::string_view name() { return "mass2_mass"; }
-        static constexpr size_t type_id() { return 10014; }
-    };
+    struct Position {};
+    struct Velocity {};
+    struct Force {};
+    struct Mass {};
 };
 
-// Tags for spring properties
 namespace spring {
-    struct Extension : categories::Analysis {
-        static constexpr std::string_view name() { return "spring_extension"; }
-        static constexpr size_t type_id() { return 10021; }
-    };
-
-    struct PotentialEnergy : categories::Analysis {
-        static constexpr std::string_view name() { return "spring_potential_energy"; }
-        static constexpr size_t type_id() { return 10022; }
-    };
-
-    struct Stiffness : categories::Analysis {
-        static constexpr std::string_view name() { return "spring_stiffness"; }
-        static constexpr size_t type_id() { return 10023; }
-    };
+    struct Extension {};
+    struct PotentialEnergy {};
+    struct Stiffness {};
 }
 
-// Tags for system-level quantities
 namespace system {
-    struct TotalEnergy : categories::Analysis {
-        static constexpr std::string_view name() { return "total_energy"; }
-        static constexpr size_t type_id() { return 10031; }
-    };
-
-    struct CenterOfMass : categories::Kinematics {
-        static constexpr std::string_view name() { return "center_of_mass"; }
-        static constexpr size_t type_id() { return 10032; }
-    };
-
-    struct Momentum : categories::Dynamics {
-        static constexpr std::string_view name() { return "momentum"; }
-        static constexpr size_t type_id() { return 10033; }
-    };
+    struct TotalEnergy {};
+    struct CenterOfMass {};
+    struct Momentum {};
 }
 
 } // namespace sopot::physics::coupled

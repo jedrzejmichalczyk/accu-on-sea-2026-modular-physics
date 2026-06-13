@@ -73,11 +73,11 @@ public:
         std::span<const T> global,
         const Registry& registry
     ) const {
-        // dx/dt = v (from local state)
+        // dx/dt = v        — velocity is our own second state variable
         T velocity = local[1];
 
-        // dv/dt = F/m (force from registry)
-        T force = registry.template computeFunction<typename TagSet::Force>(global);
+        // dv/dt = F/m      — ask the system for the force on this mass
+        T force = query<typename TagSet::Force>(registry, global);
         T acceleration = force / T(m_mass);
 
         return {velocity, acceleration};
@@ -117,19 +117,5 @@ using Mass1 = PointMass<mass1, T>;
 
 template<Scalar T = double>
 using Mass2 = PointMass<mass2, T>;
-
-//=============================================================================
-// Factory Functions
-//=============================================================================
-
-template<Scalar T = double>
-Mass1<T> createMass1(double mass, double x0 = 0.0, double v0 = 0.0) {
-    return Mass1<T>(mass, x0, v0, "mass1");
-}
-
-template<Scalar T = double>
-Mass2<T> createMass2(double mass, double x0 = 0.0, double v0 = 0.0) {
-    return Mass2<T>(mass, x0, v0, "mass2");
-}
 
 } // namespace sopot::physics::coupled

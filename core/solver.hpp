@@ -4,7 +4,6 @@
 #include <span>
 #include <chrono>
 #include <concepts>
-#include <functional>
 
 namespace sopot {
 
@@ -12,7 +11,6 @@ namespace sopot {
 using StateVector = std::vector<double>;
 using StateDerivative = std::vector<double>;
 using StateView = std::span<const double>;
-using MutableStateView = std::span<double>;
 
 // Solution data structure
 struct SolutionResult {
@@ -29,20 +27,14 @@ struct SolutionResult {
     }
 };
 
-// ODE system concept for compile-time typed systems
-template<typename System>
-concept ODESystemConcept = requires(const System& sys, double t, StateView state) {
-    { sys.getStateDimension() } -> std::convertible_to<size_t>;
-    { sys.getInitialState() } -> std::convertible_to<StateVector>;
-};
-
-// Derivative function concept
+// A derivative function maps (t, state) to dy/dt. The solver is generic over
+// any callable that satisfies this - the coupled oscillator's RHS is just one.
 template<typename F>
 concept DerivativeFunctionConcept = requires(F f, double t, StateView state) {
     { f(t, state) } -> std::convertible_to<StateDerivative>;
 };
 
-// High-performance RK4 solver - pure compile-time dispatch
+// Classic fixed-step Runge-Kutta 4 integrator.
 class RK4Solver {
 private:
     mutable StateVector m_k1, m_k2, m_k3, m_k4;
@@ -138,49 +130,6 @@ public:
 
         return result;
     }
-
-    // Convenience overload that takes dimension and uses zero initial state
-    template<DerivativeFunctionConcept DerivFunc>
-    SolutionResult solve(
-        DerivFunc&& derivs,
-        size_t state_dim,
-        double t_start,
-        double t_end,
-        double dt
-    ) const {
-        StateVector initial_state(state_dim, 0.0);
-        return solve(std::forward<DerivFunc>(derivs), state_dim, t_start, t_end, dt, initial_state);
-    }
-
-    // Solve for ODE system that provides getInitialState
-    template<ODESystemConcept System, DerivativeFunctionConcept DerivFunc>
-    SolutionResult solve(
-        const System& system,
-        DerivFunc&& derivs,
-        double t_start,
-        double t_end,
-        double dt
-    ) const {
-        return solve(
-            std::forward<DerivFunc>(derivs),
-            system.getStateDimension(),
-            t_start, t_end, dt,
-            system.getInitialState()
-        );
-    }
-
-    constexpr std::string_view getSolverName() const {
-        return "RK4";
-    }
-
-    constexpr size_t getOrder() const {
-        return 4;
-    }
 };
-
-// Factory function
-inline RK4Solver createRK4Solver() {
-    return RK4Solver{};
-}
 
 } // namespace sopot

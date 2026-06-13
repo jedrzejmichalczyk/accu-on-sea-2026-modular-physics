@@ -1,0 +1,16 @@
+# Normalize line endings: source and text files are LF in the repo.
+*.hpp   text eol=lf
+*.cpp   text eol=lf
+*.py    text eol=lf
+*.md    text eol=lf
+*.txt   text eol=lf
+CMakeLists.txt text eol=lf
+.gitignore     text eol=lf
+.gitattributes text eol=lf
+
+# Binary assets — never touch line endings, never diff.
+*.pptx  binary
+*.pdf   binary
+*.png   binary
+*.jpg   binary
+*.csv   binary

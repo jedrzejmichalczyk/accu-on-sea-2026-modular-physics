@@ -47,13 +47,14 @@
 //
 // Usage:
 //   auto system = makeTypedODESystem<double>(
-//       createMass1<double>(1.0, 0.0, 0.0),   // m=1, x0=0, v0=0
-//       createMass2<double>(1.0, 2.0, 0.0),   // m=1, x0=2, v0=0
-//       createSpring<double>(4.0, 1.0),       // k=4, L0=1
-//       createEnergyMonitor<double>()
+//       Mass1<double>(1.0, 0.0, 0.0),     // m=1, x0=0, v0=0
+//       Mass2<double>(1.0, 2.0, 0.0),     // m=1, x0=2, v0=0
+//       Spring12<double>(4.0, 1.0),       // k=4, L0=1
+//       EnergyMonitor<double>()
 //   );
+//   // ...or just call createCoupledOscillator(...) below.
 //
-//   auto state = system.getInitialState();
+//   auto state  = system.getInitialState();
 //   auto energy = system.computeStateFunction<system::TotalEnergy>(state);
 //
 //=============================================================================
@@ -83,48 +84,5 @@ auto createCoupledOscillator(
         EnergyMonitor<T>("energy_monitor")
     );
 }
-
-//=============================================================================
-// Analytical Solution for Equal Masses (for validation)
-//=============================================================================
-// For m1 = m2 = m, undamped:
-//   Normal modes:
-//     1. Center-of-mass mode: x_cm = const (if initial momentum = 0)
-//     2. Relative mode: r = x1 - x2 oscillates at omega = sqrt(2k/m)
-//
-//   General solution (for zero initial velocities, symmetric initial positions):
-//     x1(t) = x_cm + 0.5 * r0 * cos(omega * t)
-//     x2(t) = x_cm - 0.5 * r0 * cos(omega * t)
-//   where r0 = x1_0 - x2_0 - L0 (initial extension)
-//
-struct AnalyticalSolution {
-    double m;           // Mass of each particle (must be equal)
-    double k;           // Spring constant
-    double L0;          // Rest length
-    double x1_0, x2_0;  // Initial positions
-    double omega;       // Angular frequency sqrt(2k/m)
-    double x_cm;        // Center of mass (constant)
-    double r0;          // Initial extension
-
-    AnalyticalSolution(double mass, double stiffness, double rest_length,
-                       double initial_x1, double initial_x2)
-        : m(mass), k(stiffness), L0(rest_length)
-        , x1_0(initial_x1), x2_0(initial_x2)
-        , omega(std::sqrt(2.0 * k / m))
-        , x_cm(0.5 * (x1_0 + x2_0))
-        , r0(x1_0 - x2_0 - L0) {}
-
-    std::pair<double, double> positions(double t) const {
-        double half_r = 0.5 * r0 * std::cos(omega * t);
-        return {x_cm + half_r + 0.5 * L0, x_cm - half_r - 0.5 * L0};
-    }
-
-    std::pair<double, double> velocities(double t) const {
-        double half_v = -0.5 * r0 * omega * std::sin(omega * t);
-        return {half_v, -half_v};
-    }
-
-    double period() const { return 2.0 * 3.14159265358979323846 / omega; }
-};
 
 } // namespace sopot::physics::coupled

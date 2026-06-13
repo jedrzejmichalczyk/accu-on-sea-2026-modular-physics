@@ -38,8 +38,6 @@ public:
     EnergyMonitor(std::string name = "energy_monitor")
         : m_name(std::move(name)) {}
 
-    void setOffset(size_t) const {} // No state
-
     //=========================================================================
     // Required Component Interface
     //=========================================================================
@@ -55,18 +53,17 @@ public:
     // Total energy = KE1 + KE2 + PE_spring
     template<typename Registry>
     T compute(system::TotalEnergy, std::span<const T> state, const Registry& registry) const {
-        // Kinetic energy of mass 1: KE1 = 0.5 * m1 * v1^2
-        T m1 = registry.template computeFunction<mass1::Mass>(state);
-        T v1 = registry.template computeFunction<mass1::Velocity>(state);
+        // Kinetic energy of each mass: KE = 0.5 * m * v^2
+        T m1 = query<mass1::Mass>(registry, state);
+        T v1 = query<mass1::Velocity>(registry, state);
         T ke1 = T(0.5) * m1 * v1 * v1;
 
-        // Kinetic energy of mass 2: KE2 = 0.5 * m2 * v2^2
-        T m2 = registry.template computeFunction<mass2::Mass>(state);
-        T v2 = registry.template computeFunction<mass2::Velocity>(state);
+        T m2 = query<mass2::Mass>(registry, state);
+        T v2 = query<mass2::Velocity>(registry, state);
         T ke2 = T(0.5) * m2 * v2 * v2;
 
-        // Spring potential energy
-        T pe = registry.template computeFunction<spring::PotentialEnergy>(state);
+        // Potential energy stored in the spring
+        T pe = query<spring::PotentialEnergy>(registry, state);
 
         return ke1 + ke2 + pe;
     }
@@ -74,33 +71,24 @@ public:
     // Center of mass: x_cm = (m1*x1 + m2*x2) / (m1 + m2)
     template<typename Registry>
     T compute(system::CenterOfMass, std::span<const T> state, const Registry& registry) const {
-        T m1 = registry.template computeFunction<mass1::Mass>(state);
-        T x1 = registry.template computeFunction<mass1::Position>(state);
-        T m2 = registry.template computeFunction<mass2::Mass>(state);
-        T x2 = registry.template computeFunction<mass2::Position>(state);
+        T m1 = query<mass1::Mass>(registry, state);
+        T x1 = query<mass1::Position>(registry, state);
+        T m2 = query<mass2::Mass>(registry, state);
+        T x2 = query<mass2::Position>(registry, state);
 
         return (m1 * x1 + m2 * x2) / (m1 + m2);
     }
 
-    // Total momentum: p = m1*v1 + m2*v2 (conserved in closed system)
+    // Total momentum: p = m1*v1 + m2*v2 (conserved in a closed system)
     template<typename Registry>
     T compute(system::Momentum, std::span<const T> state, const Registry& registry) const {
-        T m1 = registry.template computeFunction<mass1::Mass>(state);
-        T v1 = registry.template computeFunction<mass1::Velocity>(state);
-        T m2 = registry.template computeFunction<mass2::Mass>(state);
-        T v2 = registry.template computeFunction<mass2::Velocity>(state);
+        T m1 = query<mass1::Mass>(registry, state);
+        T v1 = query<mass1::Velocity>(registry, state);
+        T m2 = query<mass2::Mass>(registry, state);
+        T v2 = query<mass2::Velocity>(registry, state);
 
         return m1 * v1 + m2 * v2;
     }
 };
-
-//=============================================================================
-// Factory Function
-//=============================================================================
-
-template<Scalar T = double>
-EnergyMonitor<T> createEnergyMonitor() {
-    return EnergyMonitor<T>("energy_monitor");
-}
 
 } // namespace sopot::physics::coupled

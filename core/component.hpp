@@ -11,7 +11,7 @@
 namespace sopot {
 
 // Forward declarations
-template<size_t N, Scalar T> class TypedComponent;
+template<size_t N, Scalar T> class Component;
 
 //=============================================================================
 // Component Concepts - the contract a component meets, checked at compile time
@@ -20,7 +20,7 @@ template<size_t N, Scalar T> class TypedComponent;
 // What every component is: the state-type aliases, a compile-time state_size,
 // and an initial value for its own state slice.
 template<typename C>
-concept TypedComponentConcept = requires(const C& c) {
+concept ComponentConcept = requires(const C& c) {
     typename C::scalar_type;
     typename C::LocalState;
     typename C::LocalDerivative;
@@ -31,20 +31,20 @@ concept TypedComponentConcept = requires(const C& c) {
 // Extra contract for a component that owns state (state_size > 0): it provides
 // derivatives(t, state, registry) returning the time-derivative of its own
 // slice, reading its own variables via localState() and others via query().
-template<typename Component, typename T, typename Registry>
+template<typename C, typename T, typename Registry>
 concept HasDerivativesMethod = requires(
-    const Component& c, T t, std::span<const T> state, const Registry& registry
+    const C& c, T t, std::span<const T> state, const Registry& registry
 ) {
-    { c.derivatives(t, state, registry) } -> std::same_as<typename Component::LocalDerivative>;
+    { c.derivatives(t, state, registry) } -> std::same_as<typename C::LocalDerivative>;
 };
 
 // A component provides Tag's state function if it defines
 // compute(Tag, state, registry). Every compute() takes the registry - even the
 // ones that ignore it - so any state function may query others uniformly.
-template<typename Component, typename Tag, typename T, typename Registry>
-concept TypedProvidesStateFunction = TypedComponentConcept<Component> &&
+template<typename C, typename Tag, typename T, typename Registry>
+concept ProvidesStateFunction = ComponentConcept<C> &&
     StateTagConcept<Tag> &&
-    requires(const Component& c, std::span<const T> state, const Registry& reg) {
+    requires(const C& c, std::span<const T> state, const Registry& reg) {
         { c.compute(Tag{}, state, reg) };
     };
 
@@ -72,7 +72,7 @@ inline auto query(const Registry& registry, std::span<const T> state) {
 }
 
 //=============================================================================
-// TypedComponent - Non-virtual base class for components
+// Component - Non-virtual base class for components
 //=============================================================================
 // No virtual functions: a component just provides the methods the concepts
 // above require, resolved at compile time.
@@ -89,7 +89,7 @@ inline auto query(const Registry& registry, std::span<const T> state) {
 //=============================================================================
 
 template<size_t StateSize, Scalar T = double>
-class TypedComponent {
+class Component {
 public:
     using scalar_type = T;
     static constexpr size_t state_size = StateSize;
@@ -97,7 +97,7 @@ public:
     using LocalDerivative = ScalarState<T, StateSize>;
 
     // No virtual destructor needed - no polymorphic deletion through base pointer
-    ~TypedComponent() = default;
+    ~Component() = default;
 
     // Where this component's slice begins in the global state vector.
     size_t getStateOffset() const noexcept { return m_state_offset; }
@@ -114,19 +114,19 @@ protected:
 };
 
 //=============================================================================
-// TypedRegistry - Compile-time registry for state function dispatch
+// Registry - Compile-time registry for state function dispatch
 //=============================================================================
 // Holds references to every component and, for a given tag, resolves which
 // component provides it - entirely at compile time. The provider's compute()
 // receives the registry, so it can query further state functions in turn.
 //=============================================================================
 
-template<typename T, TypedComponentConcept... Components>
-class TypedRegistry {
+template<typename T, ComponentConcept... Components>
+class Registry {
     std::tuple<const Components&...> m_components;
 
     // Self type for concept checks
-    using Self = TypedRegistry<T, Components...>;
+    using Self = Registry<T, Components...>;
 
     // Index of the first component whose compute() accepts this tag.
     // The whole search runs during template instantiation, so by the time the
@@ -137,7 +137,7 @@ class TypedRegistry {
             return 0;  // not found; hasFunction()'s static_assert reports it
         } else {
             using ComponentType = std::tuple_element_t<Index, std::tuple<Components...>>;
-            if constexpr (TypedProvidesStateFunction<ComponentType, Tag, T, Self>) {
+            if constexpr (ProvidesStateFunction<ComponentType, Tag, T, Self>) {
                 return Index;
             } else {
                 return findProviderIndex<Tag, Index + 1>();
@@ -159,13 +159,13 @@ class TypedRegistry {
     }
 
 public:
-    explicit constexpr TypedRegistry(const Components&... components)
+    explicit constexpr Registry(const Components&... components)
         : m_components(components...) {}
 
     // Compile-time function availability check
     template<StateTagConcept Tag>
     static constexpr bool hasFunction() {
-        return (TypedProvidesStateFunction<Components, Tag, T, Self> || ...);
+        return (ProvidesStateFunction<Components, Tag, T, Self> || ...);
     }
 
     // The dispatch mechanism: hand the chosen provider the state and the
@@ -180,7 +180,7 @@ public:
 };
 
 //=============================================================================
-// TypedODESystem - Compile-time ODE system composition
+// ODESystem - Compile-time ODE system composition
 //=============================================================================
 // Composes multiple components into an ODE system.
 // All dispatch is resolved at compile time - no virtual functions.
@@ -191,14 +191,14 @@ public:
 //   - getInitialLocalState() -> LocalState
 //=============================================================================
 
-template<typename T, TypedComponentConcept... Components>
-class TypedODESystem {
+template<typename T, ComponentConcept... Components>
+class ODESystem {
 private:
     std::tuple<Components...> m_components;
-    TypedRegistry<T, Components...> m_registry;
+    Registry<T, Components...> m_registry;
 
     static constexpr size_t m_total_state_size = (Components::state_size + ...);
-    using RegistryType = TypedRegistry<T, Components...>;
+    using RegistryType = Registry<T, Components...>;
 
     // Each component owns a contiguous slice of the global state vector.
     // This precomputes where every slice starts (and the total size, last).
@@ -286,7 +286,7 @@ private:
 public:
     using scalar_type = T;
 
-    explicit TypedODESystem(Components... components)
+    explicit ODESystem(Components... components)
         : m_components(std::move(components)...)
         , m_registry(std::get<Components>(m_components)...) {
         initializeOffsets();
@@ -329,10 +329,10 @@ public:
 };
 
 // Factory function: deduces the component types so callers can write
-// makeTypedODESystem<double>(Mass1{...}, Spring12{...}, ...).
-template<typename T = double, TypedComponentConcept... Components>
-auto makeTypedODESystem(Components&&... components) {
-    return TypedODESystem<T, std::decay_t<Components>...>(
+// makeODESystem<double>(Mass1{...}, Spring12{...}, ...).
+template<typename T = double, ComponentConcept... Components>
+auto makeODESystem(Components&&... components) {
+    return ODESystem<T, std::decay_t<Components>...>(
         std::forward<Components>(components)...
     );
 }

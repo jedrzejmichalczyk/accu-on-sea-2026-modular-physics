@@ -46,7 +46,7 @@
 //    - Prevents accidental mixing of component states
 //
 // Usage:
-//   auto system = makeTypedODESystem<double>(
+//   auto system = makeODESystem<double>(
 //       Mass1<double>(1.0, 0.0, 0.0),     // m=1, x0=0, v0=0
 //       Mass2<double>(1.0, 2.0, 0.0),     // m=1, x0=2, v0=0
 //       Spring12<double>(4.0, 1.0),       // k=4, L0=1
@@ -63,7 +63,7 @@
 #include "point_mass.hpp"
 #include "spring.hpp"
 #include "energy_monitor.hpp"
-#include "../../core/typed_component.hpp"
+#include "../../core/component.hpp"
 
 namespace sopot::physics::coupled {
 
@@ -77,7 +77,7 @@ auto createCoupledOscillator(
     double m2, double x2_0, double v2_0,
     double k, double L0 = 1.0, double damping = 0.0
 ) {
-    return makeTypedODESystem<T>(
+    return makeODESystem<T>(
         Mass1<T>(m1, x1_0, v1_0),
         Mass2<T>(m2, x2_0, v2_0),
         Spring12<T>(k, L0, damping),

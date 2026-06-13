@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../../core/typed_component.hpp"
+#include "../../core/component.hpp"
 #include "../../core/scalar.hpp"
 #include "tags.hpp"
 #include <span>
@@ -24,9 +24,9 @@ namespace sopot::physics::coupled {
 //=============================================================================
 
 template<typename TagSet, Scalar T = double>
-class PointMass final : public TypedComponent<2, T> {
+class PointMass final : public Component<2, T> {
 public:
-    using Base = TypedComponent<2, T>;
+    using Base = Component<2, T>;
     using typename Base::LocalState;
     using typename Base::LocalDerivative;
 

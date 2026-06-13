@@ -145,19 +145,10 @@ public:
 protected:
     size_t m_state_offset{0};
 
-    // Helper for accessing global state from span
-    T getGlobalState(std::span<const T> global_state, size_t index) const {
-        size_t actual_index = m_state_offset + index;
-        return global_state[actual_index];
-    }
-
-    // Helper to extract local state from global state span
-    LocalState extractLocalState(std::span<const T> global_state) const {
-        LocalState local;
-        for (size_t i = 0; i < StateSize; ++i) {
-            local[i] = global_state[m_state_offset + i];
-        }
-        return local;
+    // Read one variable of THIS component's own state. The argument is the
+    // full global state vector; index is local (0-based within our slice).
+    T localState(std::span<const T> global_state, size_t index) const {
+        return global_state[m_state_offset + index];
     }
 };
 

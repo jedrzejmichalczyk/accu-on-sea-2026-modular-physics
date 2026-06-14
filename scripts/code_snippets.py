@@ -35,50 +35,42 @@ namespace spring {
 
     # ------------------------------------------------------------- pointmass
     "pointmass": {
-        "highlight_lines": (9,),
+        "highlight_lines": (8,),
         "code": """\
 template<typename TagSet, Scalar T = double>
 class PointMass final : public Component<2, T> {   // 2 states: [x, v]
     double m_mass;
 public:
     template<typename Registry>
-    LocalDerivative derivatives(T t, std::span<const T> state,
-                                const Registry& registry) const {
+    LocalDerivative derivatives(T t, std::span<const T> state, const Registry& registry) const {
         T velocity = this->localState(state, 1);          // dx/dt = v
         T force = query<typename TagSet::Force>(registry, state);
         return {velocity, force / T(m_mass)};             // dv/dt = F/m
     }
-
-    template<typename Registry>
+    template<typename Registry>            // Velocity: same, localState(s, 1)
     T compute(typename TagSet::Position, std::span<const T> s,
               const Registry&) const { return this->localState(s, 0); }
-    template<typename Registry>
-    T compute(typename TagSet::Velocity, std::span<const T> s,
-              const Registry&) const { return this->localState(s, 1); }
 };""",
     },
 
     # ---------------------------------------------------------------- spring
     "spring": {
-        "highlight_lines": (8, 9),
+        "highlight_lines": (7, 8),
         "code": """\
 template<typename TagSet1, typename TagSet2, Scalar T = double>
 class Spring final : public Component<0, T> {        // 0 states!
     double m_stiffness, m_rest_length;
 public:
     template<typename Registry>
-    T compute(typename TagSet1::Force,
-              std::span<const T> state, const Registry& registry) const {
-        T x1 = query<typename TagSet1::Position>(registry, state);
-        T x2 = query<typename TagSet2::Position>(registry, state);
+    T compute(typename TagSet1::Force, std::span<const T> state, const Registry& reg) const {
+        T x1 = query<typename TagSet1::Position>(reg, state);
+        T x2 = query<typename TagSet2::Position>(reg, state);
         T extension = x1 - x2 - T(m_rest_length);
         return -T(m_stiffness) * extension;               // Hooke's law
     }
-
     template<typename Registry>
-    T compute(typename TagSet2::Force,
-              std::span<const T> state, const Registry& registry) const {
-        return -query<typename TagSet1::Force>(registry, state);  // Newton's 3rd
+    T compute(typename TagSet2::Force, std::span<const T> state, const Registry& reg) const {
+        return -query<typename TagSet1::Force>(reg, state);       // Newton's 3rd
     }
 };""",
     },

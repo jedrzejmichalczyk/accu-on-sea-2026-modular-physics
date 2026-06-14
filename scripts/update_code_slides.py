@@ -34,6 +34,7 @@ from code_snippets import SNIPPETS
 
 # ---- theme (matches make_deck.py) -----------------------------------------
 CODE_FONT    = "Consolas"
+CODE_PT      = 16            # conference requirement: code is 16pt
 CODE_DEFAULT = RGBColor(0xD4, 0xD4, 0xD4)
 TOKEN_COLORS = {
     "Keyword":        RGBColor(0x56, 0x9C, 0xD6),
@@ -155,8 +156,7 @@ def main():
             seen.setdefault(tag, []).append(n)
             if not args.check and shape.has_text_frame:
                 snip = SNIPPETS[tag]
-                size = existing_font_size(shape.text_frame)
-                render(shape.text_frame, snip["code"], snip["highlight_lines"], size)
+                render(shape.text_frame, snip["code"], snip["highlight_lines"], Pt(CODE_PT))
 
     for tag in sorted(seen):
         print(f"  {'found' if args.check else 'updated'} code:{tag}  (slide {','.join(map(str, seen[tag]))})")

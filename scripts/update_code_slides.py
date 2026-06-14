@@ -21,6 +21,7 @@ Run:  python scripts/update_code_slides.py [path-to.pptx] [-o out.pptx] [--check
 """
 import argparse
 import os
+import re
 import sys
 
 from pptx import Presentation
@@ -64,6 +65,23 @@ def token_color(ttype):
     return CODE_DEFAULT
 
 
+# Multi-char PascalCase identifier => a type, by convention (Component, Registry,
+# LocalDerivative, TagSet, PointMass, Dual, ...). Single capitals (T, D, J, K, Q)
+# are left alone — they're as often loop/temporary variables as type params.
+_TYPE_NAME = re.compile(r"^[A-Z][A-Za-z0-9_]+$")
+
+
+def syntax_color(ttype, text):
+    """Token colour, with one fix on top of pygments: it leaves user-defined
+    type names as plain grey Name tokens and is even inconsistent about it
+    (e.g. 'Registry' teal after `typename`, grey in `const Registry&`). Promote
+    anything that looks like a type to the type colour so types are uniform."""
+    c = token_color(ttype)
+    if c == CODE_DEFAULT and _TYPE_NAME.match(text):
+        return TOKEN_COLORS["Keyword.Type"]
+    return c
+
+
 def existing_font_size(text_frame, default=Pt(14)):
     """Reuse whatever size the box currently uses, so hand-resizes stick."""
     for p in text_frame.paragraphs:
@@ -103,7 +121,7 @@ def render(text_frame, code, highlight_lines, size):
         for ttype, text in toks:
             r = p.add_run(); r.text = text
             r.font.size = size; r.font.name = CODE_FONT
-            r.font.color.rgb = YELLOW if hl else token_color(ttype)
+            r.font.color.rgb = YELLOW if hl else syntax_color(ttype, text)
             if hl:
                 r.font.bold = True
 

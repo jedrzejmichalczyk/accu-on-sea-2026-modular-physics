@@ -35,7 +35,6 @@ from code_snippets import SNIPPETS
 # ---- theme (matches make_deck.py) -----------------------------------------
 CODE_FONT    = "Consolas"
 CODE_DEFAULT = RGBColor(0xD4, 0xD4, 0xD4)
-YELLOW       = RGBColor(0xF2, 0xC7, 0x44)   # highlight colour
 TOKEN_COLORS = {
     "Keyword":        RGBColor(0x56, 0x9C, 0xD6),
     "Keyword.Type":   RGBColor(0x4E, 0xC9, 0xB0),
@@ -121,7 +120,9 @@ def render(text_frame, code, highlight_lines, size):
         for ttype, text in toks:
             r = p.add_run(); r.text = text
             r.font.size = size; r.font.name = CODE_FONT
-            r.font.color.rgb = YELLOW if hl else syntax_color(ttype, text)
+            # Emphasis is bold only: highlighted lines keep their syntax colours,
+            # so every token (e.g. query) is the same colour on every slide.
+            r.font.color.rgb = syntax_color(ttype, text)
             if hl:
                 r.font.bold = True
 

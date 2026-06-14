@@ -40,9 +40,11 @@ TOKEN_COLORS = {
     "Keyword.Type":   RGBColor(0x4E, 0xC9, 0xB0),
     "Name.Class":     RGBColor(0x4E, 0xC9, 0xB0),
     "Name.Namespace": RGBColor(0x4E, 0xC9, 0xB0),
-    "Name.Function":  RGBColor(0xDC, 0xDC, 0xAA),
     "Name.Builtin":   RGBColor(0x4E, 0xC9, 0xB0),
-    "Name.Label":     RGBColor(0xDC, 0xDC, 0xAA),
+    # Name.Function / Name.Label intentionally omitted: pygments tags a function
+    # as Name.Function only after a built-in type (void f()) and not after a
+    # user type (T f()), which made the same function two colours. Letting them
+    # fall through to the default keeps every function name uniform (grey).
     "Literal.String": RGBColor(0xCE, 0x91, 0x78),
     "Literal.Number": RGBColor(0xB5, 0xCE, 0xA8),
     "Comment":        RGBColor(0x6A, 0x99, 0x55),
@@ -64,10 +66,11 @@ def token_color(ttype):
     return CODE_DEFAULT
 
 
-# Multi-char PascalCase identifier => a type, by convention (Component, Registry,
-# LocalDerivative, TagSet, PointMass, Dual, ...). Single capitals (T, D, J, K, Q)
-# are left alone — they're as often loop/temporary variables as type params.
-_TYPE_NAME = re.compile(r"^[A-Z][A-Za-z0-9_]+$")
+# PascalCase identifier => a type, by convention (Component, Registry,
+# LocalDerivative, TagSet, PointMass, Dual, ...). Must start uppercase AND
+# contain a lowercase letter, so single capitals (T, D, J, K, Q — often
+# loop/temp vars) and ALL-CAPS constants/macros (CD, AREA) are left alone.
+_TYPE_NAME = re.compile(r"^[A-Z][A-Za-z0-9_]*[a-z][A-Za-z0-9_]*$")
 
 
 def syntax_color(ttype, text):

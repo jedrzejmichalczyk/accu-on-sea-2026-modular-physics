@@ -139,6 +139,23 @@ class Registry {
 };""",
     },
 
+    # ---------------------------------------------------------- compute/query
+    "query": {
+        "highlight_lines": (5, 10),
+        "code": """\
+// a component PROVIDES a quantity (one overload per tag):
+T compute(mass1::Force, std::span<const T> s, const Registry&) const;
+
+// anyone ASKS for one, by tag — component or driver:
+T f = query<mass1::Force>(registry, state);
+
+// query is just the registry call with friendlier syntax:
+template<StateTagConcept Tag, typename Registry, typename T>
+auto query(const Registry& reg, std::span<const T> s) {
+    return reg.computeFunction<Tag>(s);   // find provider -> provider.compute(...)
+}""",
+    },
+
     # -------------------------------------------------------------- concepts
     "concepts": {
         "highlight_lines": (),
